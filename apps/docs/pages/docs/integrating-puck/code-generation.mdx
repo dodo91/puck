@@ -1,0 +1,89 @@
+import { Callout } from "nextra/components";
+
+# Code generation
+
+You can now export a page built with Puck as plain React code. This is useful when teams want to hand editors a drag-and-drop workflow, but still check generated markup into source control (similar to tools like [ui-builder](https://github.com/olliethedev/ui-builder)).
+
+## `generateReactCode`
+
+`generateReactCode` converts a Puck `data` payload into a React component file. It walks the page structure, renders JSX for each component, and optionally tracks import statements for third-party components.
+
+```ts copy
+import { generateReactCode } from "@measured/puck";
+import { config } from "./puck.config";
+import { data } from "./page-data";
+
+const { code, imports } = generateReactCode({
+  config,
+  data,
+  componentName: "MarketingPage",
+  wrapper: { open: "<main>", close: "</main>" },
+  componentMap: {
+    AntCard: {
+      as: "Card",
+      import: { path: "antd", name: "Card" },
+      omitProps: ["layout"],
+      transformProps: ({ props }) => ({
+        title: props.heading,
+        children: props.children,
+      }),
+    },
+    Hero: {
+      import: { path: "@/components/Hero", default: true },
+    },
+  },
+});
+
+console.log(imports);
+console.log(code);
+```
+
+The helper returns:
+
+- `code`: the string for your generated React component. It includes the component definition, wrapper, and JSX for every component in the page content.
+- `imports`: a list of strings you can prepend to the file or feed to another build step.
+
+The snippet above would output something like:
+
+```tsx
+import Hero from "@/components/Hero";
+import { Card } from "antd";
+
+export function MarketingPage() {
+  return (
+    <main>
+      <Hero />
+
+      <Card title={"Built with Puck"}>
+        {"You can edit this entire page visually."}
+      </Card>
+    </main>
+  );
+}
+```
+
+<Callout>
+Call `generateReactCode` inside a build step or an API route, run the returned string through Prettier if you want different formatting, and write it to disk. This allows hybrid workflows where marketers edit visually while engineers commit the generated file.
+</Callout>
+
+## Mapping components
+
+`componentMap` lets you describe how each Puck component should be translated:
+
+- `as`: change the JSX tag name (e.g. map a `Hero` block to a custom `MarketingHero`).
+- `import`: specify `path`, `name`, and whether the import is default. The helper deduplicates imports across the generated file.
+- `omitProps`: remove internal props such as layout metadata before they become JSX attributes.
+- `preserveId`: keep `props.id` if you need it in the generated markup (by default, IDs are stripped).
+- `transformProps`: mutate props before they are serialized. Use this to rename props, move arrays into `children`, or inject computed data.
+
+If a component is not listed in `componentMap`, `generateReactCode` falls back to using the component key from your Config and renders every prop as-is. That means you can adopt the helper incrementally and only add mappings when you need custom imports or prop transforms.
+
+## Shipping generated files
+
+Because `generateReactCode` returns a plain string, you can plug it into any workflow:
+
+- **Write to disk:** generate `app/routes/generated-page.tsx` whenever editors click Publish.
+- **Send to git:** push the string to a repo for code review.
+- **Pair with server-side rendering:** feed the output into frameworks like Next.js or Remix alongside your preferred data-loading pattern.
+
+This keeps the visual editing experience in Puck while still producing auditable code that fits existing CI/CD pipelines.

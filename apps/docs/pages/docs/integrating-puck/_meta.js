@@ -10,6 +10,8 @@ const menu = {
   "data-migration": {},
   viewports: {},
   "feature-toggling": {},
+  "component-libraries": {},
+  "code-generation": {},
 };
 
 export default menu;
