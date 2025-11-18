@@ -1,148 +1,89 @@
 import { Callout } from "nextra/components";
 
-# Code generation workflows
+# Code generation
 
-Puck stores editor output as structured JSON. Because the structure is deterministic (see the [data model](/docs/api-reference/data-model/data)), you can turn published data back into source code, static markup, or any other artifact that suits your workflow.
+You can now export a page built with Puck as plain React code. This is useful when teams want to hand editors a drag-and-drop workflow, but still check generated markup into source control (similar to tools like [ui-builder](https://github.com/olliethedev/ui-builder)).
 
-This document shows how to capture data from the editor and transform it into a React module—similar to the approach taken by [ui-builder](https://github.com/olliethedev/ui-builder).
+## `generateReactCode`
 
-## Capture editor data via `onPublish`
+`generateReactCode` converts a Puck `data` payload into a React component file. It walks the page structure, renders JSX for each component, and optionally tracks import statements for third-party components.
 
-[`<Puck>`](/docs/api-reference/components/puck) surfaces an [`onPublish(data)`](/docs/api-reference/components/puck#onpublishdata) prop. Whenever an editor publishes their changes, the callback receives the full `data` payload.
+```ts copy
+import { generateReactCode } from "@measured/puck";
+import { config } from "./puck.config";
+import { data } from "./page-data";
 
-```tsx copy showLineNumbers
-import type { Config, Data } from "@measured/puck";
-import { Puck } from "@measured/puck";
+const { code, imports } = generateReactCode({
+  config,
+  data,
+  componentName: "MarketingPage",
+  wrapper: { open: "<main>", close: "</main>" },
+  componentMap: {
+    AntCard: {
+      as: "Card",
+      import: { path: "antd", name: "Card" },
+      omitProps: ["layout"],
+      transformProps: ({ props }) => ({
+        title: props.heading,
+        children: props.children,
+      }),
+    },
+    Hero: {
+      import: { path: "@/components/Hero", default: true },
+    },
+  },
+});
 
-const config: Config = { /* ...component definitions... */ };
-const initialData: Data = { /* ...seed content... */ };
+console.log(imports);
+console.log(code);
+```
 
-export function Editor() {
+The helper returns:
+
+- `code`: the string for your generated React component. It includes the component definition, wrapper, and JSX for every component in the page content.
+- `imports`: a list of strings you can prepend to the file or feed to another build step.
+
+The snippet above would output something like:
+
+```tsx
+import Hero from "@/components/Hero";
+import { Card } from "antd";
+
+export function MarketingPage() {
   return (
-    <Puck
-      config={config}
-      data={initialData}
-      onPublish={async (data) => {
-        const source = generateReactModule({ data, config });
-        await saveToRepository(source);
-      }}
-    />
+    <main>
+      <Hero />
+
+      <Card title={"Built with Puck"}>
+        {"You can edit this entire page visually."}
+      </Card>
+    </main>
   );
 }
 ```
 
-Because you control the `onPublish` callback, you can decide whether generated code is committed to git, stored alongside other CMS entries, or written to disk for use in CI.
-
-## Generate a React module from Puck data
-
-The snippet below converts a `data` payload into a React component tree. It mirrors how codegen tools such as [ui-builder](https://github.com/olliethedev/ui-builder) emit React components.
-
-```tsx copy showLineNumbers
-import type { Config, Data, Slot } from "@measured/puck";
-
-type Components = {
-  Grid: { content: Slot<Components> };
-  AntdCard: { title: string; body: string };
-};
-
-type GenerateArgs = {
-  data: Data<Components>;
-  config: Config<Components>;
-};
-
-const componentImports: Record<keyof Components, string> = {
-  Grid: "@/components/Grid",
-  AntdCard: "@/components/AntdCard",
-};
-
-export function generateReactModule({ data, config }: GenerateArgs) {
-  const usedImports = new Set<string>();
-
-  const body = data.content
-    .map((item) => renderNode(item, { usedImports, config, depth: 4 }))
-    .join("\n");
-
-  const importLines = Array.from(usedImports).map((component) => {
-    return `import ${component} from "${componentImports[component as keyof Components]}";`;
-  });
-
-  return [
-    "import React from \"react\";",
-    ...importLines,
-    "",
-    "export default function GeneratedPage() {",
-    "  return (",
-    body,
-    "  );",
-    "}",
-    "",
-  ].join("\n");
-}
-
-type RenderNodeArgs = {
-  usedImports: Set<string>;
-  config: Config<Components>;
-  depth: number;
-};
-
-type Node = Data<Components>["content"][number];
-
-function renderNode(node: Node, ctx: RenderNodeArgs): string {
-  const componentName = node.type;
-  if (!ctx.config.components[componentName]) {
-    throw new Error(`Unknown component: ${componentName}`);
-  }
-
-  ctx.usedImports.add(componentName);
-
-  const props = { ...node.props };
-  delete props.id;
-
-  const children = Object.entries(props)
-    .filter(([, value]) => Array.isArray(value) && value.every((child) => "type" in child))
-    .map(([key, value]) => {
-      const childNodes = value as Node[];
-      delete props[key];
-      const childBody = childNodes
-        .map((child) => renderNode(child, { ...ctx, depth: ctx.depth + 2 }))
-        .join("\n");
-
-      return `\n${childBody}\n${" ".repeat(ctx.depth)}`;
-    })
-    .join("");
-
-  const propString = Object.entries(props)
-    .map(([key, value]) => ` ${key}={${JSON.stringify(value)}}`)
-    .join("");
-
-  const indent = " ".repeat(ctx.depth);
-  const openingTag = `${indent}<${componentName}${propString}>`;
-  const closingTag = `${indent}</${componentName}>`;
-
-  return children ? `${openingTag}${children}${closingTag}` : `${openingTag}${closingTag}`;
-}
-```
-
-A few important details:
-
-- `componentImports` maps Puck component names to real file paths. Swap these out for the paths that match your design system.
-- Slot fields are persisted as arrays of nested components. The generator above treats any prop that looks like an array of Puck components as children and recurses into them.
-- You can embed richer logic (for example, condensing text nodes into template literals or expanding data bindings) by inspecting the component config inside `renderNode`.
-
 <Callout>
-`ui-builder` already demonstrates an end-to-end code generation workflow that targets Puck. Use it as a blueprint if you need inspiration for repo layouts, CLIs, or dev-server integration.
+Call `generateReactCode` inside a build step or an API route, run the returned string through Prettier if you want different formatting, and write it to disk. This allows hybrid workflows where marketers edit visually while engineers commit the generated file.
 </Callout>
 
-## Save artifacts wherever you need them
+## Mapping components
 
-`generateReactModule` only returns a string. You can write it to the filesystem, create a git commit, or POST it to another service. Because the generator is pure, it can also run during CI to prevent drift between the saved JSON payload and the generated files.
+`componentMap` lets you describe how each Puck component should be translated:
 
-```ts copy showLineNumbers
-import { writeFile } from "node:fs/promises";
+- `as`: change the JSX tag name (e.g. map a `Hero` block to a custom `MarketingHero`).
+- `import`: specify `path`, `name`, and whether the import is default. The helper deduplicates imports across the generated file.
+- `omitProps`: remove internal props such as layout metadata before they become JSX attributes.
+- `preserveId`: keep `props.id` if you need it in the generated markup (by default, IDs are stripped).
+- `transformProps`: mutate props before they are serialized. Use this to rename props, move arrays into `children`, or inject computed data.
 
-async function saveToRepository(source: string) {
-  await writeFile("./src/pages/generated-page.tsx", source, "utf8");
-}
-```
+If a component is not listed in `componentMap`, `generateReactCode` falls back to using the component key from your Config and renders every prop as-is. That means you can adopt the helper incrementally and only add mappings when you need custom imports or prop transforms.
 
-By combining `onPublish`, the strongly typed Puck config, and a small generator, you can export code tailored to your stack while still giving editors a visual builder.
+## Shipping generated files
+
+Because `generateReactCode` returns a plain string, you can plug it into any workflow:
+
+- **Write to disk:** generate `app/routes/generated-page.tsx` whenever editors click Publish.
+- **Send to git:** push the string to a repo for code review.
+- **Pair with server-side rendering:** feed the output into frameworks like Next.js or Remix alongside your preferred data-loading pattern.
+
+This keeps the visual editing experience in Puck while still producing auditable code that fits existing CI/CD pipelines.
