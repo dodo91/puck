@@ -1,0 +1,138 @@
+import { Callout } from "nextra/components";
+
+# Third-party component libraries
+
+Puck does not ship with a component library. Instead, you connect the editor to _your_ React components via the [Config](/docs/api-reference/configuration/config). That means you can expose components from design systems like Ant Design, Chakra UI, Material UI, your internal component library, or any other package that renders React nodes.
+
+This guide walks through a concrete Ant Design example and highlights a few patterns you can apply to any third-party library.
+
+## Example: Ant Design Card
+
+The only Puck-specific work you need to do is describe the props you want to expose to editors. You can import components straight from Ant Design inside the `render` function.
+
+```tsx copy showLineNumbers
+import type { Config } from "@measured/puck";
+import { Button, Card } from "antd";
+
+type Components = {
+  AntdCard: {
+    title: string;
+    body: string;
+    ctaLabel: string;
+    ctaType: "default" | "primary" | "link";
+    ctaHref?: string;
+  };
+};
+
+export const config: Config<Components> = {
+  categories: {
+    marketing: {
+      title: "Marketing",
+      components: ["AntdCard"],
+    },
+  },
+  components: {
+    AntdCard: {
+      label: "Ant Design card",
+      description: "Title, paragraph, and CTA built with Ant Design primitives.",
+      fields: {
+        title: { type: "text", label: "Heading" },
+        body: { type: "textarea", label: "Body copy" },
+        ctaLabel: { type: "text", label: "CTA label" },
+        ctaHref: { type: "text", label: "CTA href" },
+        ctaType: {
+          type: "select",
+          options: [
+            { label: "Default", value: "default" },
+            { label: "Primary", value: "primary" },
+            { label: "Link", value: "link" },
+          ],
+          defaultValue: "primary",
+        },
+      },
+      defaultProps: {
+        ctaLabel: "Learn more",
+        body: "Describe the value proposition in a sentence or two.",
+        title: "Ant Design + Puck",
+      },
+      render: ({ title, body, ctaHref, ctaLabel, ctaType }) => {
+        return (
+          <Card title={title} bordered>
+            <p>{body}</p>
+            <Button href={ctaHref} type={ctaType} size="large">
+              {ctaLabel}
+            </Button>
+          </Card>
+        );
+      },
+    },
+  },
+};
+```
+
+Editors can now drag the **Ant Design card** component out of the left rail, populate the form fields, and Puck will persist the Ant Design props directly inside the [data payload](/docs/api-reference/data-model/data). When you render with `@measured/puck`, those values are passed to the actual Ant Design components you imported in `render`.
+
+<Callout>
+You can expose **every** prop that matters to your editors. For Ant Design components, this often means mirroring the documented prop names (`type`, `shape`, `size`, etc.) and using [field transforms](/docs/extending-puck/field-transforms) to coerce complex values.
+</Callout>
+
+## Compose layout primitives with slots
+
+Many design systems (Ant Design included) ship layout primitives such as `Row`, `Col`, or `Flex`. Use the [`slot` field](/docs/api-reference/fields/slot) to let editors drop other components inside those layouts.
+
+```tsx copy showLineNumbers
+import type { Config, Slot } from "@measured/puck";
+import { Col, Row } from "antd";
+
+type AntdCardProps = {
+  title: string;
+  body: string;
+  ctaLabel: string;
+  ctaType: "default" | "primary" | "link";
+  ctaHref?: string;
+};
+
+type Components = {
+  Grid: {
+    content: Slot<Components>;
+    gutter?: number;
+  };
+  AntdCard: AntdCardProps;
+};
+
+export const config: Config<Components> = {
+  components: {
+    Grid: {
+      label: "Ant Design grid",
+      fields: {
+        content: { type: "slot", allow: ["AntdCard"] },
+        gutter: { type: "number", step: 8, min: 0, label: "Gutter" },
+      },
+      defaultProps: { gutter: 24 },
+      render: ({ content: Content, gutter }) => {
+        return (
+          <Row gutter={[gutter ?? 0, gutter ?? 0]}>
+            <Content
+              as={Col}
+              // Pass any Ant Design props you need at render-time.
+              span={12}
+            />
+          </Row>
+        );
+      },
+    },
+    AntdCard: { /* ...as defined earlier... */ },
+  },
+};
+```
+
+The slot field stores nested Puck components, so your `Grid` render function can render the Ant Design `Row` and `Col` components while passing slot props such as `as={Col}` or `allow`/`disallow` to control which components can be nested.
+
+## Tips for any third-party library
+
+- **Keep config colocated with the components you wrap.** Treat each wrapper as the source of truth for allowed props, sensible defaults, and documentation so your team can reason about the contract.
+- **Share tokens and themes.** You can import your Ant Design theme overrides (or any design tokens) into the same module and feed them to your component render functions.
+- **Leverage permissions and categories.** Use [`permissions`](/docs/api-reference/configuration/component-config#permissions) to lock down components that should not be duplicated and [`categories`](/docs/integrating-puck/categories) to group third-party components separately from your internal ones.
+- **Reuse metadata.** Populate [`label`](/docs/api-reference/configuration/component-config#label) and [`description`](/docs/api-reference/configuration/component-config#description) on the component config so editors can quickly identify Ant Design primitives in the component list.
+
+By treating third-party components as plain React functions, Puck can be extended to any design system without needing custom adapters.
