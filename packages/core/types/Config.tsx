@@ -1,6 +1,7 @@
 import type { JSX, ReactNode } from "react";
 import { BaseField, Field, Fields } from "./Fields";
 import { ComponentData, ComponentMetadata, RootData } from "./Data";
+import { ComponentCodegenConfig } from "./Codegen";
 
 import { AsFieldProps, WithChildren, WithId, WithPuckProps } from "./Utils";
 import { AppState } from "./AppState";
@@ -47,6 +48,7 @@ type ComponentConfigInternal<
   fields?: Fields<FieldProps, UserField>;
   permissions?: Partial<Permissions>;
   inline?: boolean;
+  codegen?: ComponentCodegenConfig<FieldProps>;
   resolveFields?: (
     data: DataShape,
     params: {

@@ -1,0 +1,110 @@
+# Code generation
+
+import { Callout } from "nextra/components";
+
+Puck can now emit React code from your editor data, similar to tools like
+[ui-builder](https://github.com/olliethedev/ui-builder). Use the
+`generateComponent` helper to turn a saved Puck document into a ready-to-use
+component file.
+
+## Generate a React component
+
+```tsx showLineNumbers copy {6}
+import { generateComponent } from "@measured/puck";
+import config from "./puck.config";
+import data from "./puck-data.json";
+
+const { code } = generateComponent({
+  config,
+  data,
+  componentName: "LandingPage",
+});
+
+console.log(code);
+```
+
+The output includes formatted imports and a React component that renders your
+Puck content inside a fragment. You can persist the string to disk, pipe it
+through a formatter, or hand it off in a PR.
+
+Need just the JSX and metadata? Use `generateJSX({ config, data })` to get the
+raw JSX tree plus a structured import list.
+
+## Describe how each component should be printed
+
+Code generation relies on the optional `codegen` property inside your component
+config. Each field lets you describe how to translate the saved props back to
+real React code:
+
+```tsx showLineNumbers copy
+const config = {
+  components: {
+    FeatureCard: {
+      fields: {
+        headline: { type: "text" },
+        children: { type: "slot" },
+        actions: { type: "slot" },
+      },
+      render: ({ headline, children, actions }) => (
+        <Card title={headline} actions={actions}>
+          {children}
+        </Card>
+      ),
+      codegen: {
+        component: "Card",
+        import: { path: "antd", name: "Card" },
+        mapProps: ({ props, slots }) => ({
+          title: props.headline,
+          children: slots.children,
+          actions: slots.actions,
+        }),
+      },
+    },
+  },
+};
+```
+
+- **`component`** – the JSX tag to emit. Defaults to the config key.
+- **`import`** – named or default imports that should accompany that component.
+- **`mapProps`** – optional hook to transform stored props. When you provide it
+you are responsible for placing slot content via `slots`.
+
+<Callout type="info">
+If you skip `mapProps`, Puck will automatically render the `children` slot as
+nested JSX and pass all other slots as fragment props. Use `mapProps` when you
+need to rename props, set defaults, or inject other expressions.
+</Callout>
+
+### Raw expressions
+
+`mapProps` receives a helper named `slots` so you can pass fragments directly to
+props such as `actions`. Use the exported `codegenExpression` helper when you
+need to provide a raw expression yourself:
+
+```tsx showLineNumbers copy
+import { codegenExpression } from "@measured/puck";
+
+codegen: {
+  component: "Card",
+  import: { path: "antd", name: "Card" },
+  mapProps: ({ props, slots }) => ({
+    title: props.headline,
+    children: slots.children,
+    extra: slots.actions ?? null,
+    icon: codegenExpression("<Sparkles />"),
+  }),
+},
+```
+
+### Formatting imports
+
+`generateJSX` returns the structured import list so you can customize how it is
+printed. Call `formatImportStatements(imports)` to convert the structure into a
+list of strings, or stitch them into your own template.
+
+## Putting it all together
+
+Once you attach `codegen` metadata to your components, you can export code for
+any React-based design system, from Ant Design to your in-house UI kit. The
+[design systems guide](/docs/guides/design-systems) walks through a complete Ant
+Design example.
