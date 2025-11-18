@@ -11,6 +11,7 @@ const menu = {
   "data-migration": {},
   viewports: {},
   "feature-toggling": {},
+  "third-party-components": {},
   "component-libraries": {},
   "code-generation": {},
 };
