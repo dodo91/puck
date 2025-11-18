@@ -84,6 +84,21 @@ export function Page() {
 }
 ```
 
+## Bring your own components
+
+Puck renders any React component, so you can wrap Ant Design, Chakra UI, or your
+internal design system without rewriting widgets. See the
+[design systems guide](https://puckeditor.com/docs/guides/design-systems) for a
+complete example.
+
+## Code generation
+
+Need code that mirrors what you built in the editor? Use the new
+`generateComponent` and `generateJSX` helpers to emit JSX and import statements
+for your preferred component library—similar to code-focused tools such as
+ui-builder. The [code generation guide](https://puckeditor.com/docs/guides/code-generation)
+covers the end-to-end workflow.
+
 ## Recipes
 
 Use `create-puck-app` to quickly spin up a a pre-configured app based on our provided [recipes](https://github.com/puckeditor/puck/tree/main/recipes):
