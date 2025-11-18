@@ -1,0 +1,108 @@
+# Ant Design
+
+[Ant Design](https://ant.design/) ships with a large number of ready-made React components. Because Puck is agnostic to the components it renders, you can expose Ant Design primitives to your editors without leaving your existing design system.
+
+## Install Ant Design
+
+Install Ant Design and its reset stylesheet in the project that hosts your editor and renderer:
+
+```bash copy
+npm install antd
+```
+
+Import the styles wherever you mount Puck (for example in `_app.tsx`):
+
+```tsx copy
+import "antd/dist/reset.css";
+```
+
+## Register Ant Design components
+
+Expose the Ant Design primitives you want your editors to use through the [Config](/docs/api-reference/configuration/config). You decide which props are editable by defining [fields](/docs/api-reference/fields):
+
+```tsx showLineNumbers copy
+import type { Config } from "@measured/puck";
+import { Button, Card } from "antd";
+
+const config: Config<{
+  ButtonBlock: {};
+  CardBlock: { title: string; children: React.ReactNode };
+}> = {
+  components: {
+    ButtonBlock: {
+      label: "Button",
+      fields: {
+        label: { type: "text" },
+        type: {
+          type: "radio",
+          options: [
+            { label: "Primary", value: "primary" },
+            { label: "Default", value: "default" },
+          ],
+        },
+      },
+      render: ({ label, type = "primary" }) => {
+        return <Button type={type}>{label}</Button>;
+      },
+    },
+    CardBlock: {
+      label: "Card",
+      fields: {
+        title: { type: "text" },
+        children: { type: "slot" },
+      },
+      render: ({ title, children }) => {
+        return <Card title={title}>{children}</Card>;
+      },
+    },
+  },
+};
+```
+
+The `children` [slot field](/docs/api-reference/fields/slot) allows editors to drag other components inside the Ant Design `Card` component, mimicking the composability they get when writing React directly.
+
+## Render and edit
+
+Provide the config to the editor and renderer just like you would for any other component library:
+
+```tsx showLineNumbers copy
+import { Puck, Render } from "@measured/puck";
+import { config } from "./puck-config";
+
+export function Editor({ data }) {
+  return <Puck config={config} data={data} onPublish={saveDraft} />;
+}
+
+export function MarketingPage({ data }) {
+  return <Render config={config} data={data} />;
+}
+```
+
+Editors can now drag the `CardBlock` and `ButtonBlock` components in the UI and produce the exact same Ant Design markup that your application uses elsewhere.
+
+## Generate Ant Design code
+
+When you want to export the authored layout as code (similar to features offered by tools like [`ui-builder`](https://github.com/olliethedev/ui-builder)), use the [`generateReactComponent`](/docs/extending-puck/code-generation) helper. It converts a Puck data payload into a React component, letting you map props to the standard Ant Design API and control the import statements:
+
+```ts copy
+import { generateReactComponent } from "@measured/puck";
+
+const { code } = generateReactComponent({
+  config,
+  data,
+  componentName: "LandingPage",
+  components: {
+    ButtonBlock: {
+      as: "Button",
+      import: { path: "antd", import: "Button" },
+      mapProps: ({ label, type }) => ({ children: label, type }),
+    },
+    CardBlock: {
+      as: "Card",
+      import: { path: "antd", import: "Card" },
+    },
+  },
+});
+```
+
+You can run the resulting `code` string through your formatting pipeline (for example Prettier) before checking it into source control.

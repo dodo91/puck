@@ -1,0 +1,84 @@
+# Code generation
+
+Puck now includes a helper for exporting visual layouts as code. This makes it easy to ship editable experiences while still producing hand-off ready React components—similar to the goals of projects such as [`ui-builder`](https://github.com/olliethedev/ui-builder).
+
+## `generateReactComponent`
+
+Use [`generateReactComponent`](https://github.com/puckeditor/puck/blob/main/packages/core/lib/codegen/generate-react.ts) when you want to convert a Puck data payload into a React component:
+
+```ts showLineNumbers copy
+import { generateReactComponent } from "@measured/puck";
+import type { Config } from "@measured/puck";
+
+const config: Config = { /* ...the same config you pass to <Puck> */ };
+const data = { /* ...stored page data */ };
+
+const { code } = generateReactComponent({
+  config,
+  data,
+  componentName: "LandingPage",
+});
+
+console.log(code);
+```
+
+The helper returns a string that contains an exported React component. By default it renders the exact components defined in your `config` and includes a React import. This is enough when your runtime environment already has those components available.
+
+## Mapping to design system components
+
+Often you will want to export a component tree that maps Puck blocks to another library (for example Ant Design, Radix, or your own design system). The `components` option lets you do that:
+
+```ts showLineNumbers copy
+const { code } = generateReactComponent({
+  config,
+  data,
+  componentName: "LandingPage",
+  components: {
+    Hero: {
+      as: "MarketingHero",
+      import: { path: "@/ui/marketing", default: "MarketingHero" },
+      mapProps: ({ title, description, buttons }) => ({
+        heading: title,
+        body: description,
+        actions: buttons,
+      }),
+    },
+    ButtonBlock: {
+      as: "Button",
+      import: { path: "antd", import: "Button" },
+      mapProps: ({ label, type }) => ({ children: label, type }),
+    },
+  },
+});
+```
+
+Each entry lets you:
+
+- **Rename the rendered component** via `as`.
+- **Control import statements** via the `import` option. Use `{ path: "package", import: "Component" }` for named imports and `{ path: "package", default: "Component" }` for default imports.
+- **Transform props** via `mapProps`, which receives the props stored in Puck's data model.
+- **Rename slot props** via `slotProps`. For example, `{ content: "children" }` renders slot content as actual React children.
+
+## Controlling the output
+
+Additional flags give you control over what the helper produces:
+
+- `componentName` — sets the exported function name.
+- `includeIds` — include the Puck `id` prop on every component (useful if you rely on it in your runtime).
+- `reactImport` — disable the default `import React from "react";` line when you are using the automatic JSX runtime.
+
+The generated string is valid JSX. If you want to keep it consistent with the rest of your repository, run it through your formatter before checking it in:
+
+```ts showLineNumbers copy
+import prettier from "prettier/standalone";
+import parserBabel from "prettier/parser-babel";
+
+const formatted = prettier.format(code, {
+  parser: "babel",
+  plugins: [parserBabel],
+});
+```
+
+## Putting it together
+
+Pairing `generateReactComponent` with an integration such as [Ant Design](/docs/integrating-puck/ant-design) lets your editor build a page visually and export the code straight into your existing component library.
