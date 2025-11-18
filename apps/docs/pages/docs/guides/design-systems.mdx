@@ -1,0 +1,120 @@
+# Design systems and component libraries
+
+import { Callout } from "nextra/components";
+
+Puck renders _your_ React components, so you can base the editor on any
+component library or design system – including Ant Design, Chakra UI, or your
+own internal UI kit.
+
+## Wrapping an Ant Design component
+
+The only requirement for a Puck component is a `render` function. You can call
+components from any npm package inside that function.
+
+```tsx showLineNumbers copy
+import { Button, Typography } from "antd";
+import type { Config } from "@measured/puck";
+
+type Components = {
+  HeroHeading: { title: string };
+  PrimaryButton: { label: string; url: string };
+};
+
+export const config: Config<Components> = {
+  components: {
+    HeroHeading: {
+      label: "Hero heading",
+      fields: {
+        title: { type: "text" },
+      },
+      render: ({ title }) => <Typography.Title level={2}>{title}</Typography.Title>,
+      codegen: {
+        component: "Typography.Title",
+        import: { path: "antd", name: "Typography" },
+        mapProps: ({ props }) => ({
+          level: 2,
+          children: props.title,
+        }),
+      },
+    },
+    PrimaryButton: {
+      label: "Primary CTA",
+      fields: {
+        label: { type: "text" },
+        url: { type: "text" },
+      },
+      render: ({ label, url }) => (
+        <Button type="primary" href={url}>
+          {label}
+        </Button>
+      ),
+      codegen: {
+        component: "Button",
+        import: { path: "antd", name: "Button" },
+        mapProps: ({ props }) => ({
+          type: "primary",
+          href: props.url,
+          children: props.label,
+        }),
+      },
+    },
+  },
+};
+```
+
+`codegen` is optional unless you plan to export code. When provided, it tells
+Puck how to map the component back to your UI library (more details in the
+[code-generation guide](/docs/guides/code-generation)).
+
+## Managing slots for complex components
+
+Ant Design components frequently take React nodes such as headers, footers, or
+actions. Use the `slot` field type to expose additional editable regions:
+
+```tsx showLineNumbers copy {10-17}
+const config = {
+  components: {
+    FeatureCard: {
+      label: "Feature card",
+      fields: {
+        title: { type: "text" },
+        description: { type: "slot" },
+        actions: { type: "slot" },
+      },
+      render: ({ title, description, actions }) => (
+        <Card
+          title={title}
+          actions={actions}
+        >
+          {description}
+        </Card>
+      ),
+      codegen: {
+        component: "Card",
+        import: { path: "antd", name: "Card" },
+        mapProps: ({ props, slots }) => ({
+          title: props.title,
+          children: slots.description,
+          actions: slots.actions,
+        }),
+      },
+    },
+  },
+};
+```
+
+`slots` expose the rendered JSX for each region so you can pass it directly to
+Ant Design props such as `actions`, `title`, or `children`.
+
+<Callout type="info">
+When you add a `mapProps` function you’re in full control of which slots become
+props. If you omit `mapProps` the generator will automatically output the
+`children` slot as nested JSX and all other slots as fragment props.
+</Callout>
+
+## Go further with code generation
+
+The new `generateComponent` helper can emit an entire React component built from
+Puck data. Combine it with the `codegen` configuration above to output valid Ant
+Design code or to hand off work to another team. See the
+[code generation guide](/docs/guides/code-generation) for end-to-end examples.
