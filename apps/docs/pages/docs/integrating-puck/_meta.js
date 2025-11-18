@@ -1,5 +1,6 @@
 const menu = {
   "component-configuration": {},
+  "ant-design": { title: "Ant Design" },
   "root-configuration": {},
   "multi-column-layouts": {},
   categories: {},

@@ -1,5 +1,6 @@
 const menu = {
   composition: {},
+  "code-generation": { title: "Code generation" },
   "custom-fields": {},
   "field-transforms": {},
   "internal-puck-api": {},
