@@ -19,11 +19,13 @@ export * from "../components/Render";
 
 export * from "../lib/migrate";
 export * from "../lib/transform-props";
+export * from "../lib/codegen";
 export { registerOverlayPortal } from "../lib/overlay-portal";
 export * from "../lib/resolve-all-data";
 export * from "../lib/codegen/generate-react";
 export { setDeep } from "../lib/data/set-deep";
 export { walkTree } from "../lib/data/walk-tree";
+export * from "../lib/codegen";
 export {
   createUsePuck,
   usePuck,

@@ -1,0 +1,113 @@
+import { Callout } from "nextra/components";
+
+# Component libraries & design systems
+
+Puck renders whichever React components you give it. That includes any design system or third-party library (Ant Design, Chakra UI, MUI, custom company kits, etc). All you need to do is describe the component API via [`config.components`](/docs/integrating-puck/component-configuration).
+
+## Bringing Ant Design components into Puck
+
+The Ant Design ecosystem already ships ready-made React components. To expose them to Puck:
+
+1. Install the dependency (and its CSS) in your host app.
+2. Create a [Config](/docs/api-reference/configuration/config) entry for each component you want to expose.
+3. Describe the editable props with Puck [fields](/docs/api-reference/fields) so that editors can update them inside the visual editor.
+
+```tsx copy
+import type { Config } from "@measured/puck";
+import { Button, Card, Col, Row } from "antd";
+import "antd/dist/reset.css";
+
+type Components = {
+  AntButton: {
+    label: string;
+    href?: string;
+    variant: "primary" | "dashed" | "link";
+  };
+  AntCard: {
+    title: string;
+    description: string;
+  };
+  AntGrid: {
+    columns: number;
+    items: any[];
+  };
+};
+
+export const config: Config<Components> = {
+  components: {
+    AntButton: {
+      label: "Button",
+      render: ({ label, href, variant }) => (
+        <Button type={variant} href={href} size="large">
+          {label}
+        </Button>
+      ),
+      fields: {
+        label: { type: "text", contentEditable: true },
+        href: { type: "text" },
+        variant: {
+          type: "radio",
+          options: [
+            { label: "primary", value: "primary" },
+            { label: "dashed", value: "dashed" },
+            { label: "link", value: "link" },
+          ],
+        },
+      },
+      defaultProps: {
+        label: "Button",
+        variant: "primary",
+      },
+    },
+    AntCard: {
+      label: "Card",
+      render: ({ title, description, children }) => (
+        <Card title={title} bordered>
+          <p>{description}</p>
+          {children}
+        </Card>
+      ),
+      fields: {
+        title: { type: "text", contentEditable: true },
+        description: { type: "textarea", contentEditable: true },
+        children: { type: "slot" },
+      },
+    },
+    AntGrid: {
+      label: "Grid",
+      fields: {
+        items: { type: "slot" },
+        columns: {
+          type: "number",
+          min: 1,
+          max: 4,
+        },
+      },
+      render: ({ columns, items }) => (
+        <Row gutter={24}>
+          {items?.map((item, index) => (
+            <Col key={index} span={24 / columns}>
+              {item}
+            </Col>
+          ))}
+        </Row>
+      ),
+    },
+  },
+};
+```
+
+Editors can now drag **AntButton**, **AntCard**, and **AntGrid** straight onto the canvas. They will see Ant Design’s props exposed through the field definitions you supplied, and the rendered preview uses the actual Ant Design components.
+
+<Callout type="info">
+Ant Design’s default theme expects its CSS reset. Remember to import the stylesheet (or your custom theme) wherever Puck renders so the preview and the final Render component stay in sync.
+</Callout>
+
+## Tips for other libraries
+
+- **Wrap thinly.** Keep the `render` function a minimal wrapper around the third-party component so that props map cleanly between Puck and your runtime.
+- **Use [slot fields](/docs/api-reference/fields/slot)** to let editors drop arbitrary content inside layout components such as `Row`, `Grid`, `Tabs`, or `Card` bodies.
+- **Group by category.** Libraries like Ant Design ship dozens of components. Use [`config.categories`](/docs/integrating-puck/categories) to keep the component picker manageable.
+- **Share prop types.** When the design system already exports TypeScript types, re-use them in your Config so that Puck’s field definitions stay in sync with upstream changes.
+
+Because Puck just calls your `render` function, the same pattern works for Chakra UI, Material UI, Radix, Tailwind component kits, or proprietary design systems.
